@@ -78,6 +78,20 @@ async function destroySession(id) {
   await session.browser?.close().catch(() => {})
 }
 
+async function pruneSessions({ forceOldest = false } = {}) {
+  const now = Date.now()
+  for (const session of sessions.values()) {
+    if (now > session.expiresAt) await destroySession(session.id)
+  }
+
+  while (forceOldest && sessions.size >= MAX_SESSIONS) {
+    const oldest = Array.from(sessions.values())
+      .sort((a, b) => a.lastSeenAt - b.lastSeenAt)[0]
+    if (!oldest) break
+    await destroySession(oldest.id)
+  }
+}
+
 function serializeSession(session) {
   return {
     id: session.id,
@@ -91,8 +105,10 @@ function serializeSession(session) {
 }
 
 async function createBrowserSession({ syncUrl, syncToken, noteLoginUrl }) {
+  await pruneSessions({ forceOldest: true })
+
   if (sessions.size >= MAX_SESSIONS) {
-    const error = new Error('Too many active sessions')
+    const error = new Error('ブラウザセッションの上限に達しました。数分待つか、RenderでサービスをRestartしてください。')
     error.status = 429
     throw error
   }
@@ -335,9 +351,7 @@ app.post('/api/sessions/:id/close', async (req, res, next) => {
 })
 
 setInterval(() => {
-  for (const session of sessions.values()) {
-    if (Date.now() > session.expiresAt) destroySession(session.id)
-  }
+  pruneSessions().catch((error) => console.error(error))
 }, 30_000).unref()
 
 app.use((error, _req, res, _next) => {
