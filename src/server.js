@@ -10,7 +10,7 @@ const TTL_MS = Number(process.env.SESSION_TTL_MINUTES || 10) * 60 * 1000
 const MAX_SESSIONS = Number(process.env.MAX_SESSIONS || 3)
 const DEFAULT_SYNC_URL = process.env.NOTE_AUTO_SYNC_URL || ''
 const DEFAULT_NOTE_LOGIN_URL = 'https://note.com/login'
-const APP_VERSION = 'copy-flow-2026-06-03.2'
+const APP_VERSION = 'copy-flow-2026-06-03.3'
 
 const app = express()
 app.set('trust proxy', 1)
@@ -251,7 +251,7 @@ app.get('/s/:id', (req, res, next) => {
           <button type="submit">移動</button>
         </form>
       </main>
-      <script src="/remote.js" type="module"></script>`
+      <script src="/remote.js?v=${encodeURIComponent(APP_VERSION)}" type="module"></script>`
     res.send(html(body, 'Remote Browser'))
   } catch (error) {
     next(error)
