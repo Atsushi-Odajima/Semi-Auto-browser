@@ -10,13 +10,18 @@ const TTL_MS = Number(process.env.SESSION_TTL_MINUTES || 10) * 60 * 1000
 const MAX_SESSIONS = Number(process.env.MAX_SESSIONS || 3)
 const DEFAULT_SYNC_URL = process.env.NOTE_AUTO_SYNC_URL || ''
 const DEFAULT_NOTE_LOGIN_URL = 'https://note.com/login'
+const APP_VERSION = 'copy-flow-2026-06-03.2'
 
 const app = express()
 app.set('trust proxy', 1)
 app.use(helmet({ contentSecurityPolicy: false }))
+app.use((_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store')
+  next()
+})
 app.use(express.json({ limit: '1mb' }))
 app.use(express.urlencoded({ extended: false }))
-app.use(express.static('public', { maxAge: '1h' }))
+app.use(express.static('public', { maxAge: 0, etag: false }))
 app.use(rateLimit({ windowMs: 60_000, limit: 180 }))
 
 const sessions = new Map()
@@ -94,6 +99,7 @@ async function pruneSessions({ forceOldest = false } = {}) {
 
 function serializeSession(session) {
   return {
+    version: APP_VERSION,
     id: session.id,
     currentUrl: session.page.url(),
     expiresAt: session.expiresAt,
@@ -170,7 +176,11 @@ async function hasNoteSessionCookie(context) {
 }
 
 app.get('/healthz', (_req, res) => {
-  res.json({ ok: true, activeSessions: sessions.size })
+  res.json({ ok: true, version: APP_VERSION, activeSessions: sessions.size })
+})
+
+app.get('/version', (_req, res) => {
+  res.type('text/plain').send(APP_VERSION)
 })
 
 app.get('/', (_req, res) => {
@@ -187,6 +197,7 @@ app.get('/', (_req, res) => {
         <button type="submit">ブラウザを開始</button>
       </form>
       <p class="note">セッションは ${Math.round(TTL_MS / 60_000)} 分で期限切れになります。Cookie はこのサービスには保存しません。</p>
+      <p class="version">version: ${APP_VERSION}</p>
     </main>`
   res.send(html(body))
 })
@@ -209,6 +220,7 @@ app.get('/s/:id', (req, res, next) => {
         <header class="remote-header">
           <div>
             <strong>Semi-Auto Browser</strong>
+            <span class="version">version: ${APP_VERSION}</span>
             <small id="url">${escapeHtml(session.page.url())}</small>
           </div>
           <button id="refresh" type="button">更新</button>
