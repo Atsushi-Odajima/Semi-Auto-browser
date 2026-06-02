@@ -22,13 +22,22 @@ app.use(rateLimit({ windowMs: 60_000, limit: 180 }))
 const sessions = new Map()
 
 const startSchema = z.object({
-  syncUrl: z.string().url(),
-  syncToken: z.string().min(20),
+  syncUrl: z.string().url().optional().or(z.literal('')),
+  syncToken: z.string().optional().or(z.literal('')),
   noteLoginUrl: z.string().url().optional(),
 })
 
 function randomId(bytes = 18) {
   return crypto.randomBytes(bytes).toString('base64url')
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
 }
 
 function html(body, title = 'Semi-Auto Browser') {
@@ -42,15 +51,6 @@ function html(body, title = 'Semi-Auto Browser') {
 </head>
 <body>${body}</body>
 </html>`
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;')
 }
 
 function assertSession(req) {
@@ -116,8 +116,8 @@ async function createBrowserSession({ syncUrl, syncToken, noteLoginUrl }) {
     browser,
     context,
     page,
-    syncUrl,
-    syncToken,
+    syncUrl: syncUrl || '',
+    syncToken: syncToken || '',
     expiresAt: Date.now() + TTL_MS,
     lastSeenAt: Date.now(),
     capturedAt: null,
@@ -161,15 +161,13 @@ app.get('/', (_req, res) => {
   const body = `
     <main class="shell">
       <h1>Semi-Auto Browser</h1>
-      <p class="lead">iPhone から一時ブラウザを操作し、note.com のログイン Cookie を note-auto-poster に同期します。</p>
+      <p class="lead">iPhone から一時ブラウザを操作し、note.com のログイン Cookie を取得します。取得後は Cookie をコピーして note-auto-poster に貼り付けます。</p>
       <form method="post" action="/sessions" class="panel">
-        <label>sync URL
-          <input name="syncUrl" type="url" required value="${escapeHtml(DEFAULT_SYNC_URL)}" placeholder="https://your-app.vercel.app/api/sync-cookie">
+        <label>note login URL
+          <input name="noteLoginUrl" type="url" value="${DEFAULT_NOTE_LOGIN_URL}">
         </label>
-        <label>cookie sync token
-          <textarea name="syncToken" required rows="4" placeholder="note-auto-poster のアカウント詳細で発行した token"></textarea>
-        </label>
-        <input name="noteLoginUrl" type="hidden" value="${DEFAULT_NOTE_LOGIN_URL}">
+        <input name="syncUrl" type="hidden" value="${escapeHtml(DEFAULT_SYNC_URL)}">
+        <input name="syncToken" type="hidden" value="">
         <button type="submit">ブラウザを開始</button>
       </form>
       <p class="note">セッションは ${Math.round(TTL_MS / 60_000)} 分で期限切れになります。Cookie はこのサービスには保存しません。</p>
@@ -211,8 +209,15 @@ app.get('/s/:id', (req, res, next) => {
           <button data-key="Enter" type="button">Enter</button>
           <button data-key="Tab" type="button">Tab</button>
           <button data-key="Backspace" type="button">削除</button>
-          <button id="capture" type="button">Cookie同期</button>
+          <button id="capture" type="button">Cookie取得</button>
         </div>
+        <section id="cookiePanel" class="cookie-panel" hidden>
+          <label>取得したCookie
+            <textarea id="cookieOutput" rows="4" readonly></textarea>
+          </label>
+          <button id="copyCookie" type="button">取得したCookieをコピー</button>
+          <p class="note">コピー後、note-auto-poster のアカウント詳細にある「Cookieを貼り付け」へ入れてください。</p>
+        </section>
         <form id="navForm" class="toolbar">
           <input id="navInput" type="url" value="https://note.com/login">
           <button type="submit">移動</button>
@@ -294,6 +299,14 @@ app.post('/api/sessions/:id/capture', async (req, res, next) => {
       return res.status(400).json({ error: '_note_session Cookie が見つかりません。note.com にログイン済みか確認してください。' })
     }
 
+    session.capturedAt = Date.now()
+    session.status = 'captured'
+    session.message = 'Cookie を取得しました'
+
+    if (!session.syncUrl || !session.syncToken) {
+      return res.json({ ok: true, cookie: header })
+    }
+
     const syncRes = await fetch(session.syncUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -301,14 +314,11 @@ app.post('/api/sessions/:id/capture', async (req, res, next) => {
     })
     const text = await syncRes.text()
     if (!syncRes.ok) {
-      return res.status(syncRes.status).json({ error: text || 'Cookie 同期に失敗しました' })
+      return res.status(syncRes.status).json({ error: text || 'Cookie 同期に失敗しました', cookie: header })
     }
 
-    session.capturedAt = Date.now()
-    session.status = 'captured'
     session.message = 'Cookie を同期しました'
-    await destroySession(session.id)
-    res.json({ ok: true })
+    res.json({ ok: true, cookie: header })
   } catch (error) {
     next(error)
   }

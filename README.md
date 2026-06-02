@@ -2,7 +2,7 @@
 
 Semi-Auto Browser is a small cloud browser service for iPhone-assisted note.com cookie sync.
 
-It opens a temporary Playwright Chromium session with an iPhone-like viewport, lets the user operate it from an iPhone web page, captures note.com cookies after manual login, and posts them to an existing `note-auto-poster` `/api/sync-cookie` endpoint.
+It opens a temporary Playwright Chromium session with an iPhone-like viewport, lets the user operate it from an iPhone web page, and captures note.com cookies after manual login. The primary flow is to copy the captured Cookie header and paste it into `note-auto-poster`.
 
 The Playwright npm package and Docker image must stay on the same version. This project pins both to `1.60.0`.
 
@@ -22,12 +22,13 @@ This service replaces the PC-only `scripts/note_cookie_sync/capture_and_sync.py`
 1. Open the note account detail page in `note-auto-poster`.
 2. Issue a cookie sync token.
 3. Open this service on iPhone.
-4. Paste the sync URL and token.
-5. Start a browser session.
-6. Tap/type through note.com login.
-7. Press `Cookie同期`.
-8. The service posts `{ token, cookie }` to `/api/sync-cookie`.
-9. The temporary browser is closed.
+4. Start a browser session.
+5. Tap/type through note.com login.
+6. Press `Cookie取得`.
+7. Press `取得したCookieをコピー`.
+8. Paste the copied Cookie into `note-auto-poster` account detail > `Cookieを貼り付け`.
+
+The older direct-sync flow can still be used internally if both `syncUrl` and `syncToken` are supplied, but copy-and-paste is the recommended fallback because it is easier to debug.
 
 Cookies are kept in memory only while the browser session is active. They are not stored by this service.
 

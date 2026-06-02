@@ -151,3 +151,21 @@ a {
 #capture {
   background: #1f8f62;
 }
+
+.cookie-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #2b3036;
+  border-radius: 8px;
+  background: #17191c;
+}
+
+.cookie-panel textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.cookie-panel[hidden] {
+  display: none;
+}

@@ -7,6 +7,9 @@ const statusEl = document.querySelector('#status')
 const urlEl = document.querySelector('#url')
 const textInput = document.querySelector('#textInput')
 const navInput = document.querySelector('#navInput')
+const cookiePanel = document.querySelector('#cookiePanel')
+const cookieOutput = document.querySelector('#cookieOutput')
+const copyCookie = document.querySelector('#copyCookie')
 
 let viewport = { width: 390, height: 844 }
 let busy = false
@@ -25,7 +28,11 @@ async function api(path, body) {
     body: JSON.stringify(body || {}),
   })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || '操作に失敗しました')
+  if (!res.ok) {
+    const error = new Error(data.error || '操作に失敗しました')
+    error.data = data
+    throw error
+  }
   return data
 }
 
@@ -46,6 +53,16 @@ async function refresh() {
   } finally {
     busy = false
   }
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+  cookieOutput.focus()
+  cookieOutput.select()
+  document.execCommand('copy')
 }
 
 screenButton.addEventListener('click', async (event) => {
@@ -98,13 +115,31 @@ document.querySelector('#navForm').addEventListener('submit', async (event) => {
 document.querySelector('#refresh').addEventListener('click', refresh)
 
 document.querySelector('#capture').addEventListener('click', async () => {
-  if (!confirm('note.com の Cookie を note-auto-poster に同期しますか？')) return
   try {
-    statusEl.textContent = 'Cookie 同期中...'
-    await api('/capture')
-    statusEl.textContent = 'Cookie 同期が完了しました。このセッションは閉じられました。'
+    statusEl.textContent = 'Cookie 取得中...'
+    const data = await api('/capture')
+    cookieOutput.value = data.cookie
+    cookiePanel.hidden = false
+    await copyText(data.cookie)
+    statusEl.textContent = 'Cookie を取得してコピーしました。note-auto-poster に貼り付けてください。'
   } catch (error) {
+    if (error.data?.cookie) {
+      cookieOutput.value = error.data.cookie
+      cookiePanel.hidden = false
+    }
     statusEl.textContent = error.message
+  }
+})
+
+copyCookie.addEventListener('click', async () => {
+  if (!cookieOutput.value) return
+  try {
+    await copyText(cookieOutput.value)
+    statusEl.textContent = 'Cookie をコピーしました。'
+  } catch {
+    cookieOutput.focus()
+    cookieOutput.select()
+    statusEl.textContent = 'コピーできない場合は、Cookie欄を長押ししてコピーしてください。'
   }
 })
 
