@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: semi-auto-browser
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_TTL_MINUTES
+        value: 10
+      - key: MAX_SESSIONS
+        value: 2
+      - key: NOTE_AUTO_SYNC_URL
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
