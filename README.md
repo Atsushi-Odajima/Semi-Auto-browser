@@ -4,6 +4,8 @@ Semi-Auto Browser is a small cloud browser service for iPhone-assisted note.com 
 
 It opens a temporary Playwright Chromium session with an iPhone-like viewport, lets the user operate it from an iPhone web page, captures note.com cookies after manual login, and posts them to an existing `note-auto-poster` `/api/sync-cookie` endpoint.
 
+The Playwright npm package and Docker image must stay on the same version. This project pins both to `1.60.0`.
+
 ## Why This Exists
 
 `note-auto-poster` already has:
